@@ -147,13 +147,31 @@ int lb_main(struct xdp_md* ctx) {
   // Record them in the stats as they are eligible for load balancing.
   ++c->rx_packet_total;
   c->rx_total_size += data_end - data;
-
+  /* #### NODE SELECTION LOGIC #### */
   struct tcphdr* tcp = (struct tcphdr*)(ip + 1);
 
-  uint32_t key = ip->saddr + tcp->source;
+//  uint32_t key = ip->saddr + tcp->source;
   debugk("incoming packet: ip=%pI4 port=%u", &ip->saddr, ntohs(tcp->source));
 
-  uint32_t dest_idx = (key % config->num_dests) + 1;
+  struct flow {
+    __u32 saddr;
+    __u32 daddr;
+    __u16 sport;
+    __u16 dport;
+    __u8  proto;
+    __u8  pad[3];
+  } __attribute__((packed));
+  struct flow tuple = {
+    .saddr = ip->saddr,
+    .daddr = ip->daddr,
+    .sport = tcp->source,
+    .dport = tcp->dest,
+    .proto = ip->protocol,
+    .pad  = {0},
+  };
+  __u32 hashed_flow = bpf_csum_diff(NULL, 0, (__be32 *)&tuple, sizeof(tuple), 0);
+
+  uint32_t dest_idx = (hashed_flow % config->num_dests) + 1;
   debugk("dest_idx=%d", dest_idx);
   struct destination_entry* dest = bpf_map_lookup_elem(&destinations_map, &dest_idx);
   if (!dest) {
