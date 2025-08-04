@@ -57,6 +57,14 @@ struct {
   __type(value, struct lb_config);
 } lb_config_map SEC(".maps");
 
+// mg_lut (maglev lookup table)
+struct {
+  __uint(type, BPF_MAP_TYPE_ARRAY);
+  __uint(max_entries, 65537);
+  __type(key, uint32_t);
+  __type(value, uint8_t);
+} mg_lut SEC(".maps");
+
 // destination_entry carries a info that is needed to construct an encap packet
 // to the destination.
 struct destination_entry {
@@ -169,10 +177,10 @@ int lb_main(struct xdp_md* ctx) {
     .pad  = {0},
   };
   __u32 hashed_flow = bpf_csum_diff(NULL, 0, (__be32 *)&tuple, sizeof(tuple), 0);
-  __u32 key = (csum ^ (csum >> 16)) * 0x45d9f3b; // 撹拌できるらしい
+  __u32 key = (hashed_flow ^ (hashed_flow >> 16)) * 0x45d9f3b; // 撹拌できるらしい
 //  uint32_t key = ip->saddr + tcp->source;
 
-  uint32_t dest_idx = (hashed_flow % config->num_dests) + 1;
+  uint32_t dest_idx = (key % config->num_dests) + 1;
   debugk("dest_idx=%d", dest_idx);
   struct destination_entry* dest = bpf_map_lookup_elem(&destinations_map, &dest_idx);
   if (!dest) {
