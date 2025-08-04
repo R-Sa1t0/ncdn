@@ -115,6 +115,20 @@ func (lb *L4LB) Sync() error {
 		return fmt.Errorf("Failed to update DestinationArray: %w", err)
 	}
 
+	if len(lb.cfg.Dests) >= 1 {
+		lutSize := uint32(65537)
+		lutKeys := make([]uint32, lutSize)
+		lutVal := make([]uint8, lutSize)
+		for i := uint32(0); i < lutSize; i++ {
+			lutKeys[i] = i
+			lutVal[i] = uint8(i % uint32(len(lb.cfg.Dests)))
+		}
+		_, err = lb.bindings.MgLut.BatchUpdate(lutKeys, lutVal, &ebpf.BatchOptions{})
+		if err != nil {
+			return fmt.Errorf("Failed to update MgLut: %w", err)
+		}
+	}
+
 	return nil
 }
 
