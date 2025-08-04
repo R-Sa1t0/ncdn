@@ -150,7 +150,6 @@ int lb_main(struct xdp_md* ctx) {
   /* #### NODE SELECTION LOGIC #### */
   struct tcphdr* tcp = (struct tcphdr*)(ip + 1);
 
-//  uint32_t key = ip->saddr + tcp->source;
   debugk("incoming packet: ip=%pI4 port=%u", &ip->saddr, ntohs(tcp->source));
 
   struct flow {
@@ -170,6 +169,8 @@ int lb_main(struct xdp_md* ctx) {
     .pad  = {0},
   };
   __u32 hashed_flow = bpf_csum_diff(NULL, 0, (__be32 *)&tuple, sizeof(tuple), 0);
+  __u32 key = (csum ^ (csum >> 16)) * 0x45d9f3b; // 撹拌できるらしい
+//  uint32_t key = ip->saddr + tcp->source;
 
   uint32_t dest_idx = (hashed_flow % config->num_dests) + 1;
   debugk("dest_idx=%d", dest_idx);
